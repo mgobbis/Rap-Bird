@@ -1,0 +1,67 @@
+#include <Servo.h>
+
+// Botões
+const int btnStart = 2;
+const int btnRestart = 3;
+const int btnRed = 4;
+const int btnBlue = 5;
+
+// Servos
+Servo motor1;
+Servo motor2;
+
+bool motoresAtivados = false;
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(btnStart, INPUT_PULLUP);
+  pinMode(btnRestart, INPUT_PULLUP);
+  pinMode(btnRed, INPUT_PULLUP);
+  pinMode(btnBlue, INPUT_PULLUP);
+
+  motor1.attach(9);
+  motor2.attach(10);
+
+  motor1.write(0);
+  motor2.write(0);
+}
+
+void loop() {
+  // Leitura dos botões
+  if (digitalRead(btnStart) == LOW) {
+    Serial.println("START");
+    delay(300);
+  }
+  if (digitalRead(btnRestart) == LOW) {
+    Serial.println("RESTART");
+    delay(300);
+  }
+  if (digitalRead(btnRed) == LOW) {
+    Serial.println("RED_JUMP");
+    delay(100);
+  }
+  if (digitalRead(btnBlue) == LOW) {
+    Serial.println("BLUE_JUMP");
+    delay(100);
+  }
+
+  // Resposta aos comandos do Python
+  if (Serial.available()) {
+    String comando = Serial.readStringUntil('\n');
+    comando.trim();
+
+    if (comando == "MOTOR_GO" && !motoresAtivados) {
+      motor1.write(40);
+      motor2.write(40);
+      delay(1000);
+      motor1.write(0);
+      motor2.write(0);
+      motoresAtivados = true;
+    }
+
+    if (comando == "RESET_MOTOR") {
+      motoresAtivados = false;
+    }
+  }
+}
