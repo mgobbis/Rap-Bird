@@ -2,17 +2,23 @@ import pygame
 import random
 import sys
 import os
+import serial
+import time
+
+try:
+    arduino = serial.Serial('COM3', 9600) 
+    time.sleep(2) 
+except serial.SerialException:
+    print("⚠️ Arduino não conectado ou porta errada.")
+    arduino = None
 
 pygame.init()
-
 
 SCREEN_WIDTH, SCREEN_HEIGHT = 1278, 1111
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Flappy Bird Multiplayer")
 
-
 WHITE, RED, BLUE, GREEN, BLACK = (255,255,255), (255,0,0), (0,0,255), (0,255,0), (0,0,0)
-
 
 ASSETS_DIR = "assets"
 bg_image = pygame.image.load(os.path.join(ASSETS_DIR, "start.png"))
@@ -35,7 +41,6 @@ restart_button_img = pygame.image.load(os.path.join(ASSETS_DIR, "restart_button.
 restart_button_img = pygame.transform.scale(restart_button_img, (450, 225))
 restart_button_rect = restart_button_img.get_rect(center=(1000, 943))
 
-
 bird_image_red_open = pygame.image.load(os.path.join(ASSETS_DIR, "red_bird_open.png")).convert_alpha()
 bird_image_red_open = pygame.transform.scale(bird_image_red_open, (150, 100))
 
@@ -47,8 +52,6 @@ bird_image_blue = pygame.transform.scale(bird_image_blue, (150, 100))
 
 bird_image_blue_closed = pygame.image.load(os.path.join(ASSETS_DIR, "blue_bird_closed.png")).convert_alpha()
 bird_image_blue_closed = pygame.transform.scale(bird_image_blue_closed, (150, 100))
-
-
 
 pipe_image = pygame.image.load(os.path.join(ASSETS_DIR, "pipe.png")).convert_alpha()
 pipe_image = pygame.transform.scale(pipe_image, (52, 320))
@@ -130,6 +133,26 @@ class Pipe:
         if bird.x + 34 > self.x and bird.x < self.x + new_width:
             if bird.y < self.height or bird.y + 24 > self.height + self.gap:
                 bird.alive = False
+
+def read_serial_command():
+    # >>> MOD Arduino: Lê comandos da porta serial (se disponíveis)
+    if arduino and arduino.in_waiting:
+        try:
+            return arduino.readline().decode().strip()
+        except:
+            return None
+    return None
+
+def send_motor_command():
+    # >>> MOD Arduino: Envia comando para ativar motores
+    if arduino:
+        arduino.write(b"MOTOR_GO\n")
+
+def reset_motor_command():
+    # >>> MOD Arduino: Reseta estado dos motores
+    if arduino:
+        arduino.write(b"RESET_MOTOR\n")
+
 def show_winner_screen(winner_color):
     if winner_color == RED:
         screen.blit(red_win_img, (0, 0))
@@ -139,31 +162,46 @@ def show_winner_screen(winner_color):
     screen.blit(restart_button_img, restart_button_rect)
     pygame.display.flip()
 
+    # >>> MOD Arduino: Aciona motores
+    send_motor_command()
+
     waiting = True
     while waiting:
+        command = read_serial_command()
+        if command == "RESTART":
+            reset_motor_command()
+            return True
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if restart_button_rect.collidepoint(event.pos):
+                    reset_motor_command()
                     return True
-                
-def show_draw_screen():
-    # Desenha a tela de empate
-    screen.blit(draw_img, (0, 0))
 
-    # Centraliza o botão de restart
+def show_draw_screen():
+    screen.blit(draw_img, (0, 0))
     restart_rect = restart_button_img.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 370))
     screen.blit(restart_button_img, restart_rect)
     pygame.display.flip()
 
+    # >>> MOD Arduino: Aciona motores
+    send_motor_command()
+
     waiting = True
     while waiting:
+        command = read_serial_command()
+        if command == "RESTART":
+            reset_motor_command()
+            return True
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if restart_rect.collidepoint(event.pos):
+                    reset_motor_command()
                     return True
 
 def show_start_screen():
@@ -171,6 +209,10 @@ def show_start_screen():
         screen.blit(bg_image, (0, 0))
         screen.blit(start_button_img, start_button_rect)
         pygame.display.flip()
+
+        command = read_serial_command()
+        if command == "START":
+            return
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -196,6 +238,12 @@ def main():
             screen.blit(bg_game_image, (0, 0))
             frame_count += 1
 
+            command = read_serial_command()
+            if command == "RED_JUMP" and bird_red.alive:
+                bird_red.jump()
+            elif command == "BLUE_JUMP" and bird_blue.alive:
+                bird_blue.jump()
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit(); sys.exit()
@@ -204,11 +252,6 @@ def main():
                         bird_red.jump()
                     if event.key == bird_blue.control_key and bird_blue.alive:
                         bird_blue.jump()
-                    if game_over:
-                        if event.key == pygame.K_r:
-                            running = False
-                        elif event.key == pygame.K_q:
-                            pygame.quit(); sys.exit()
 
             if bird_red.alive or bird_blue.alive:
                 if frame_count % 90 == 0:
@@ -242,21 +285,7 @@ def main():
                     restart = show_winner_screen(BLUE)
                 else:
                     restart = show_draw_screen()
-
                 game_over = True
-            if not bird_red.alive and not bird_blue.alive and not game_over:
-                if bird_red.score > bird_blue.score:
-                    restart = show_winner_screen(RED)
-                elif bird_blue.score > bird_red.score:
-                    restart = show_winner_screen(BLUE)
-                else:
-                    restart = show_draw_screen()
-
-                game_over = True
-
-
-            if game_over and not restart:
-                pygame.display.flip()
 
             if restart:
                 break
