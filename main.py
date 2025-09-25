@@ -54,6 +54,10 @@ pipe_image = pygame.image.load(os.path.join(ASSETS_DIR, "pipe.png")).convert_alp
 pipe_image = pygame.transform.scale(pipe_image, (52, 320))
 pipe_top_image = pygame.transform.flip(pipe_image, False, True)
 
+draw_img = pygame.image.load(os.path.join(ASSETS_DIR, "draw.png"))
+draw_img = pygame.transform.scale(draw_img, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
+
 class Bird:
     def __init__(self, color, control_key):
         self.x = 100 if color == RED else 200
@@ -143,22 +147,24 @@ def show_winner_screen(winner_color):
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if restart_button_rect.collidepoint(event.pos):
                     return True
+                
+def show_draw_screen():
+    # Desenha a tela de empate
+    screen.blit(draw_img, (0, 0))
 
-def show_game_over(bird, side):
-    font = pygame.font.SysFont(None, 36)
-    text1 = font.render("Game Over", True, BLACK)
-    text2 = font.render(f"Score: {bird.score}", True, BLACK)
-    if side == "left":
-        screen.blit(text1, (20, 20))
-        screen.blit(text2, (20, 60))
-    else:
-        screen.blit(text1, (SCREEN_WIDTH - text1.get_width() - 20, 20))
-        screen.blit(text2, (SCREEN_WIDTH - text2.get_width() - 20, 60))
+    # Centraliza o botão de restart
+    restart_rect = restart_button_img.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 370))
+    screen.blit(restart_button_img, restart_rect)
+    pygame.display.flip()
 
-def show_restart():
-    font = pygame.font.SysFont(None, 32)
-    text = font.render("Press R to Restart | Q to Quit", True, BLACK)
-    screen.blit(text, (SCREEN_WIDTH//2 - text.get_width()//2, SCREEN_HEIGHT//2))
+    waiting = True
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if restart_rect.collidepoint(event.pos):
+                    return True
 
 def show_start_screen():
     while True:
@@ -235,28 +241,21 @@ def main():
                 elif bird_blue.score > bird_red.score:
                     restart = show_winner_screen(BLUE)
                 else:
-                    screen.blit(bg_game_image, (0, 0))
-                    show_game_over(bird_red, "left")
-                    show_game_over(bird_blue, "right")
-                    screen.blit(restart_button_img, restart_button_rect)
-                    pygame.display.flip()
+                    restart = show_draw_screen()
 
-                    waiting = True
-                    while waiting:
-                        for event in pygame.event.get():
-                            if event.type == pygame.QUIT:
-                                pygame.quit(); sys.exit()
-                            elif event.type == pygame.MOUSEBUTTONDOWN:
-                                if restart_button_rect.collidepoint(event.pos):
-                                    restart = True
-                                    waiting = False
+                game_over = True
+            if not bird_red.alive and not bird_blue.alive and not game_over:
+                if bird_red.score > bird_blue.score:
+                    restart = show_winner_screen(RED)
+                elif bird_blue.score > bird_red.score:
+                    restart = show_winner_screen(BLUE)
+                else:
+                    restart = show_draw_screen()
 
                 game_over = True
 
+
             if game_over and not restart:
-                show_restart()
-                show_game_over(bird_red, "left")
-                show_game_over(bird_blue, "right")
                 pygame.display.flip()
 
             if restart:
