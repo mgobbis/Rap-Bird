@@ -91,8 +91,3 @@ Rap-Bird/
 Este projeto está aberto para uso e modificação. Sinta-se à vontade para contribuir.
 
 
-
----
-
-Quer que eu gere também o arquivo `.exe` para você ou que explique como fazer isso detalhadamente?
-```
